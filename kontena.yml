@@ -1,0 +1,67 @@
+stack: jussi/graceful
+version: 1.1.0
+variables:
+
+  use_lb:
+    type: boolean
+    from:
+      env: USE_LB
+      prompt: Use loadbalancer
+
+  lb:
+    only_if: use_lb
+    type: string
+    from:
+      env: LOADBALANCER
+      service_link:
+        prompt: Choose a loadbalancer
+        image: kontena/lb
+
+  vhost:
+    only_if: use_lb
+    type: string
+    empty_is_nil: true
+    required: false
+    from:
+      env: VHOST
+      prompt: Virtual host, empty for none
+
+  vpath:
+    only_if: use_lb
+    type: string
+    empty_is_nil: true
+    required: false
+    from:
+      env: VPATH
+      prompt: Virtual path, empty for none
+
+
+services:
+  stop:
+    image: jnummelin/graceful-stop:latest
+    links:
+      # {% if use_lb %}
+      - {{ lb }}
+      # {% endif %}
+    deploy:
+      wait_for_port: 8080
+      min_health: 0.8
+    health_check:
+      protocol: http
+      port: 8080
+      uri: /ping
+      initial_delay: 10
+      timeout: 2
+      interval: 10
+    stop_grace_period: 15s
+    environment:
+      # {% if use_lb %}
+      KONTENA_LB_INTERNAL_PORT: 8080
+      # {% if vhost %}
+      KONTENA_LB_VIRTUAL_HOSTS: {{ vhost }}
+      # {% endif %}
+      # {% if vpath %}
+      KONTENA_LB_VIRTUAL_PATH: {{ vpath }}
+      KONTENA_LB_KEEP_VIRTUAL_PATH: 'true'
+      # {% endif %}
+      # {% endif %}
